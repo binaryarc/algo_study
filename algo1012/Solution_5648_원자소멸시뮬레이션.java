@@ -1,153 +1,103 @@
 package algo1012;
-
 import java.io.*;
 import java.util.*;
-
 /*
- * 주어지는 이동방향 0상 , 1하 , 2좌 ,3우 
- * 1초에 1만큼 이동
- * 모든 원자들은 최초 위치에서 동시에 이동시작
- * 두 개이상 원자 충돌 할 경우 보유한 에너지를 방출하고 소멸
+ * 시간 1,373 ms
+ * 메모리 150,424 kb
+ * 아이디어 : 각 원소 이동후 충돌지점에서 원소들의 에너지량과 충돌지점의 에너지량 확인후
+ * 다르면 충돌로 원소 소멸
+ * 각칸이 아니라 중간에서 원소들이 만날 수 있기 때문에 원소들의 위치를 * 2
+ * 음수제거를 위해 입력위치 +1000
+ * 제한범위는 2000 * 2 로 설정 하여 넘어간다면 소멸
  */
 public class Solution_5648_원자소멸시뮬레이션 {
+
+	static int[] dx = { 0, 0, -1, 1 };
+	static int[] dy = { 1, -1, 0, 0 };
+
 	static class Atom {
-		int x, y;
-		int energy;
-		int dir;
+		int x, y, d, e;
 
 		public Atom(int x, int y, int d, int e) {
-			this.x = x;
-			this.y = y;
-			this.dir = d;
-			this.energy = e;
+			this.x = x * 2;
+			this.y = y * 2;
+			this.d = d;
+			this.e = e;
+
 		}
 	}
+	
 
-	static int[] dr = { 1, -1, 0, 0 };
-	static int[] dc = { 0, 0, -1, 1 };
-	static int N;
-	static int[][] board;
-	static int cur_cnt;
-	static int cur_emmit;
-	static List<Atom> list;
-	static Map<String, ArrayDeque<Atom>> map;
-	static final int BOUNDARY = 2000; // 경계 설정
+	static List<Atom> atoms;
+	static int total_energy;
+	static final int BOUNDARY = 4000;
+	static int[][] map;
 
 	public static void main(String[] args) throws Exception {
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		StringTokenizer st = new StringTokenizer(br.readLine());
+		StringBuilder sb = new StringBuilder();
 		int T = Integer.parseInt(st.nextToken());
+		atoms = new ArrayList<Atom>();
+		map = new int[4001][4001];
 		for (int tc = 1; tc <= T; tc++) {
 
-			list = new ArrayList<Atom>();
-			map = new HashMap<String, ArrayDeque<Atom>>();
 			st = new StringTokenizer(br.readLine());
-			N = Integer.parseInt(st.nextToken());
+			int N = Integer.parseInt(st.nextToken());
+
+			atoms.clear();
+
 			for (int i = 0; i < N; i++) {
 				st = new StringTokenizer(br.readLine());
 				int x = Integer.parseInt(st.nextToken());
 				int y = Integer.parseInt(st.nextToken());
-				int dir = Integer.parseInt(st.nextToken()); // 이동방향
-				int K = Integer.parseInt(st.nextToken()); // 에너지
-				list.add(new Atom(x, y, dir, K));
-			}
-			solve();
-			System.out.println("#" + tc + " " + cur_emmit);
-
-		}
-	}
-
-	private static void solve() {
-		cur_cnt = N;
-		cur_emmit = 0;
-		while (cur_cnt > 1) {
-			checkMidpointCollisions();
-			move();
-			boom();
-			if (cur_cnt <= 1) {
-				return;
+				int d = Integer.parseInt(st.nextToken());
+				int e = Integer.parseInt(st.nextToken());
+				atoms.add(new Atom(x + 1000, y + 1000, d, e));
 			}
 
+			total_energy = 0;
+			simul();
+			sb.append("#").append(tc).append(" ").append(total_energy).append("\n");
+			atoms.clear();
+
 		}
+		System.out.println(sb);
 	}
 
-	private static void checkMidpointCollisions() {
-		boolean[] isDeleted = new boolean[list.size()];
+	private static void simul() {
+		while (!atoms.isEmpty()) {
+			
+			//이동
+			for (int i = atoms.size() - 1; i >= 0; i--) {
 
-		for (int i = 0; i < list.size(); i++) {
-			if (isDeleted[i])
-				continue;
-			Atom atom1 = list.get(i);
-			for (int j = i + 1; j < list.size(); j++) {
-				if (isDeleted[j])
+				Atom atom = atoms.get(i);
+				map[atom.y][atom.x] = 0;
+				atom.x += dx[atom.d];
+				atom.y += dy[atom.d];
+
+				if (atom.x > BOUNDARY || atom.y > BOUNDARY || atom.x < 0 || atom.y < 0) {
+					atoms.remove(i);
 					continue;
-				Atom atom2 = list.get(j);
-				// 서로 반대 방향에서 중간 지점에서 만나서 충돌하는지 확인
-				if (checkCollision(atom1, atom2)) {
-					cur_emmit += (atom1.energy + atom2.energy);
-					isDeleted[i] = true;
-					isDeleted[j] = true;
-					break;
+				}
+
+				map[atom.y][atom.x] += atom.e;
+
+			}
+			
+			//충돌
+			for (int i = atoms.size() - 1; i >= 0; i--) {
+
+				Atom atom = atoms.get(i);
+				//자신의 에너지와 충돌지점의 에너지가 다르다면 충돌한것임
+				if (map[atom.y][atom.x] != atom.e) {
+					total_energy += atom.e;
+					atoms.remove(i);
+					map[atom.y][atom.x] = 0;
 				}
 			}
 		}
 
-		for (int i = list.size() - 1; i >= 0; i--) {
-			if (isDeleted[i]) {
-				list.remove(i);
-			}
-		}
-		System.out.println(cur_emmit);
-		cur_cnt = list.size();
 	}
 
-	private static boolean checkCollision(Atom atom1, Atom atom2) {
-		return (atom1.dir == 0 && atom2.dir == 1 && atom1.y == atom2.y + 1 && atom1.x == atom2.x)
-				|| (atom1.dir == 1 && atom2.dir == 0 && atom1.y == atom2.y - 1 && atom1.x == atom2.x)
-				|| (atom1.dir == 2 && atom2.dir == 3 && atom1.x == atom2.x + 1 && atom1.y == atom2.y)
-				|| (atom1.dir == 3 && atom2.dir == 2 && atom1.x == atom2.x - 1 && atom1.y == atom2.y);
-	}
-
-	private static void boom() {
-		List<Atom> newList = new ArrayList<Atom>();
-		for (ArrayDeque<Atom> atoms : map.values()) {
-			if (atoms.size() >= 2) {
-				while (!atoms.isEmpty()) {
-					Atom at = atoms.poll();
-					cur_emmit += at.energy;
-					cur_cnt--;
-				}
-			} else if (atoms.size() == 1) {
-				newList.add(atoms.poll());
-			}
-		}
-		list = newList;
-	}
-
-	private static void move() {
-		map.clear();
-		Iterator<Atom> iter = list.iterator();
-		while (iter.hasNext()) {
-
-			Atom atom = iter.next();
-
-			atom.y += dr[atom.dir];
-			atom.x += dc[atom.dir];
-
-			if (Math.abs(atom.x) > BOUNDARY || Math.abs(atom.y) > BOUNDARY) {
-				iter.remove();
-				cur_cnt--;
-				continue;
-			}
-
-			String key = atom.x + "," + atom.y;
-			if (!map.containsKey(key)) {
-				map.put(key, new ArrayDeque<>());
-			}
-
-			map.get(key).offer(atom);
-
-		}
-
-	}
 }
